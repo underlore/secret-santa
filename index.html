@@ -150,12 +150,46 @@
         .success {
             color: #51cf66;
         }
+
+        .warning-note {
+            font-size: 13px;
+            color: #8fa8c4;
+            margin-bottom: 24px;
+            padding: 12px 16px;
+            background: rgba(143, 168, 196, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid rgba(143, 168, 196, 0.3);
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        .warning-note strong {
+            color: #ffffff;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .used-message {
+            font-size: 14px;
+            color: #8fa8c4;
+            margin-top: 20px;
+            font-style: italic;
+        }
+
+        select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>Secret Santa</h1>
-    <div class="form-group">
+    <div class="warning-note">
+        <strong>⚠️ Important</strong>
+        Veuillez sélectionner uniquement votre propre nom. Chaque personne ne peut voir son destinataire qu'une seule fois.
+    </div>
+    <div class="form-group" id="formGroup">
         <select id="nameSelect">
             <option value="">Select your name</option>
         </select>
@@ -163,15 +197,38 @@
     <button onclick="displayRecipient()" id="findButton">Find Gift Recipient</button>
     <p id="loading">Loading...</p>
     <p id="recipientOutput"></p>
+    <p id="usedMessage" class="used-message" style="display: none;">Vous avez déjà consulté votre destinataire.</p>
 </div>
 <script>
     let assignments = {};
+    const STORAGE_KEY = 'secretSantaUsed';
+
+    // Vérifier si déjà utilisé au chargement
+    function checkIfAlreadyUsed() {
+        const used = localStorage.getItem(STORAGE_KEY);
+        if (used === 'true') {
+            disableInterface();
+            const savedRecipient = localStorage.getItem('secretSantaRecipient');
+            if (savedRecipient) {
+                document.getElementById('recipientOutput').textContent = savedRecipient;
+                document.getElementById('recipientOutput').className = 'success';
+            }
+            document.getElementById('usedMessage').style.display = 'block';
+        }
+    }
+
+    function disableInterface() {
+        document.getElementById('nameSelect').disabled = true;
+        document.getElementById('findButton').disabled = true;
+        document.getElementById('formGroup').style.opacity = '0.5';
+    }
 
     fetch('assignments.json')
         .then(response => response.json())
         .then(data => {
             assignments = data;
             populateDropdown();
+            checkIfAlreadyUsed();
             document.getElementById('loading').style.display = 'none';
         })
         .catch(error => {
@@ -194,6 +251,11 @@
     }
 
     function displayRecipient() {
+        // Vérifier si déjà utilisé
+        if (localStorage.getItem(STORAGE_KEY) === 'true') {
+            return;
+        }
+
         const name = document.getElementById('nameSelect').value;
         const output = document.getElementById('recipientOutput');
         
@@ -205,8 +267,15 @@
         
         const recipient = assignments[name];
         if (recipient) {
-            output.textContent = `Your gift recipient is: ${recipient}`;
+            const message = `Your gift recipient is: ${recipient}`;
+            output.textContent = message;
             output.className = 'success';
+            
+            // Sauvegarder dans localStorage et désactiver l'interface
+            localStorage.setItem(STORAGE_KEY, 'true');
+            localStorage.setItem('secretSantaRecipient', message);
+            disableInterface();
+            document.getElementById('usedMessage').style.display = 'block';
         } else {
             output.textContent = 'Name not found!';
             output.className = 'error';
@@ -215,7 +284,7 @@
 
     // Allow Enter key to trigger the button
     document.getElementById('nameSelect').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !document.getElementById('findButton').disabled) {
             displayRecipient();
         }
     });
